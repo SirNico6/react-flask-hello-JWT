@@ -1,53 +1,112 @@
 const getState = ({ getStore, getActions, setStore }) => {
 	return {
 		store: {
-			message: null,
 			demo: [
 				{
 					title: "FIRST",
 					background: "white",
-					initial: "white"
+					initial: "white",
 				},
 				{
 					title: "SECOND",
 					background: "white",
-					initial: "white"
-				}
-			]
+					initial: "white",
+				},
+			],
+			token: localStorage.getItem("token") || null,
+			user: null,
+			isAuthenticated: localStorage.getItem("token") ? true : false,
 		},
 		actions: {
-			// Use getActions to call a function within a fuction
-			exampleFunction: () => {
-				getActions().changeColor(0, "green");
-			},
+			register: async (name, email, password) => {
+				const myHeaders = new Headers();
+				myHeaders.append("Content-Type", "application/json");
 
-			getMessage: async () => {
-				try{
-					// fetching data from the backend
-					const resp = await fetch(process.env.BACKEND_URL + "/api/hello")
-					const data = await resp.json()
-					setStore({ message: data.message })
-					// don't forget to return something, that is how the async resolves
-					return data;
-				}catch(error){
-					console.log("Error loading message from backend", error)
+				try {
+					const response = await fetch(`${process.env.BACKEND_URL}/api/signup`, {
+						method: "POST",
+						headers: myHeaders,
+						body: JSON.stringify({ name, email, password }),
+					});
+
+					const data = await response.json();
+
+					if (response.ok) {
+						alert("User created sucessfully");
+						return true;
+					} else {
+						alert(data.msg || "Error creating user");
+						return false;
+					}
+				} catch (error) {
+					console.error("Error at register:", error);
+					return false;
 				}
 			},
-			changeColor: (index, color) => {
-				//get the store
+
+			login: async (email, password) => {
+				const myHeaders = new Headers();
+				myHeaders.append("Content-Type", "application/json");
+
+				try {
+					const response = await fetch(`${process.env.BACKEND_URL}api/login`, {
+						method: "POST",
+						headers: myHeaders,
+						body: JSON.stringify({ email, password }),
+					});
+					const data = await response.json();
+					if (response.ok) {
+						localStorage.setItem("token", data.token);
+						setStore({ token: data.access_token, user: email, isAuthenticated: true });
+						return true;
+					} else {
+						alert(data.msg || "Invalid credentials");
+						return false;
+					}
+				} catch (error) {
+					console.error("Login error:", error);
+					return false;
+				}
+			},
+
+			logout: () => {
+				localStorage.removeItem("token");
+				setStore({ token: null, user: null, isAuthenticated: false });
+			},
+
+			isAuthenticated: () => {
+				const store = getStore();
+				return !!store.token;
+			},
+
+			getProtectedData: async () => {
 				const store = getStore();
 
-				//we have to loop the entire demo array to look for the respective index
-				//and change its color
-				const demo = store.demo.map((elm, i) => {
-					if (i === index) elm.background = color;
-					return elm;
-				});
+				if (!store.token) {
+					console.error("User not autenticated");
+					return;
+				}
 
-				//reset the global store
-				setStore({ demo: demo });
-			}
-		}
+				try {
+					const response = await fetch(`${process.env.BACKEND_URL}api/protected`, {
+						method: "GET",
+						headers: {
+							Authorization: `Bearer ${store.token}`,
+						},
+					});
+
+					if (response.ok) {
+						const data = await response.json();
+						console.log("Protected data:", data);
+					} else {
+						alert("Not authorized or invalid token");
+					}
+				} catch (error) {
+					console.error("Error at get protected data:", error);
+				}
+			},
+
+		},
 	};
 };
 
